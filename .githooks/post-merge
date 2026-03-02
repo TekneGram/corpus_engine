@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "$ROOT_DIR"
+
+HOOKS_PATH="$(git config --get core.hooksPath || true)"
+if [[ "$HOOKS_PATH" != ".githooks" ]]; then
+  echo "[post-merge] Hooks path is '$HOOKS_PATH'. Run ./tools/install_git_hooks.sh to use .githooks."
+fi
+
+if [[ -x "./tools/check_dependencies.sh" ]]; then
+  echo "[post-merge] Running quick dependency boundary check..."
+  ./tools/check_dependencies.sh
+fi
+
+echo "[post-merge] Completed."

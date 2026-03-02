@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "$ROOT_DIR"
+
+echo "[pre-push] Running CI checks..."
+./tools/run_ci_checks.sh
+
+if [[ "${RUN_INTEGRATION_CHECKS:-0}" == "1" ]]; then
+  echo "[pre-push] Running integration pipeline on _demo_corpus..."
+  TMP_OUT_DIR="$(mktemp -d /tmp/corpus_integration.XXXXXX)"
+  trap 'rm -rf "$TMP_OUT_DIR"' EXIT
+  ./corpus_pipeline models/english-partut-ud-2.5-191206.udpipe _demo_corpus "$TMP_OUT_DIR"
+
+  sqlite3 "$TMP_OUT_DIR/corpus.db" \
+    "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('document','folder_segment','document_segment');" \
+    >/dev/null
+fi
+
+echo "[pre-push] Passed."

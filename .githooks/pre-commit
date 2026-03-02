@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "$ROOT_DIR"
+
+echo "[pre-commit] Running dependency boundary checks..."
+./tools/check_dependencies.sh
+
+echo "[pre-commit] Building project..."
+./tools/build.sh
+
+if [[ "${RUN_SMOKE_CHECKS:-0}" == "1" ]]; then
+  echo "[pre-commit] Running smoke pipeline on _demo_corpus..."
+  TMP_OUT_DIR="$(mktemp -d /tmp/corpus_smoke.XXXXXX)"
+  trap 'rm -rf "$TMP_OUT_DIR"' EXIT
+  ./corpus_pipeline models/english-partut-ud-2.5-191206.udpipe _demo_corpus "$TMP_OUT_DIR"
+
+  for required_file in word.bin lemma.bin pos.bin head.bin deprel.bin corpus.db; do
+    if [[ ! -f "$TMP_OUT_DIR/$required_file" ]]; then
+      echo "[pre-commit] Missing expected smoke output: $required_file" >&2
+      exit 1
+    fi
+  done
+fi
+
+echo "[pre-commit] Passed."

@@ -1,0 +1,15 @@
+# Local UDPipe source checkout / build artifacts
+udpipe/
+
+# Local model directories
+models/
+model/
+_demo_corpus/
+_demo_output_multi/
+
+# Common file patterns
+*.model
+*.udpipe
+*.vscode
+.DS_Store
+corpus_pipeline

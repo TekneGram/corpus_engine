@@ -1,0 +1,1 @@
+Read all the files in the planning folder before starting any work.
