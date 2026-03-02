@@ -18,6 +18,18 @@ This project follows the layered architecture in
 - UDPipe model in `./models/english-partut-ud-2.5-191206.udpipe`
 - SQLite3 development library
 
+## Getting UDPipe and Model Files
+
+This repository does not include `udpipe/` source or model binaries.
+
+- UDPipe source code:
+  - https://github.com/ufal/udpipe
+  - Clone/copy into `./udpipe`
+- Example English UDPipe model:
+  - https://lindat.mff.cuni.cz/repository/items/41f05304-629f-4313-b9cf-9eeb0a2ca7c6
+  - Place the model file at:
+    `./models/english-partut-ud-2.5-191206.udpipe`
+
 ## Build
 
 ```bash
