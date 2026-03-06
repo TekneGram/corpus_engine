@@ -37,12 +37,12 @@ This repository does not include `udpipe/` source or model binaries.
 ```
 
 This script builds UDPipe (`udpipe/src/libudpipe.a`) if needed and then
-builds `corpus_pipeline`.
+builds `corpus_build_pipeline`.
 
 ## Run
 
 ```bash
-./corpus_pipeline \
+./corpus_build_pipeline \
   models/english-partut-ud-2.5-191206.udpipe \
   _demo_corpus \
   corpus_output
@@ -54,7 +54,7 @@ and sparse-matrix files in `corpus_output/`.
 Optional semantic mapping rules can be supplied as a 4th argument:
 
 ```bash
-./corpus_pipeline \
+./corpus_build_pipeline \
   models/english-partut-ud-2.5-191206.udpipe \
   _demo_corpus \
   corpus_output \

@@ -24,6 +24,6 @@ g++ -std=c++11 -Wall -Wextra -pedantic \
   corpus_computing_engine/sparse_matrix_builder.cpp \
   orchestration_layer/corpus_engine.cpp \
   udpipe/src/libudpipe.a -lsqlite3 \
-  -o corpus_pipeline
+  -o corpus_build_pipeline
 
 echo "Build passed."
