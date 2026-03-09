@@ -4,6 +4,7 @@
 #include <cerrno>
 #include <cstring>
 #include <fstream>
+#include <cmath>
 #include <map>
 #include <regex>
 #include <sstream>
@@ -416,18 +417,46 @@ namespace teknegram {
             }
         }
 
+        int ClampPercent(int percent) {
+            if (percent < 0) {
+                return 0;
+            }
+            if (percent > 100) {
+                return 100;
+            }
+            return percent;
+        }
+
+        int ComputeFileLoopPercent(std::size_t processed_files, std::size_t total_files) {
+            if (total_files == 0U) {
+                return 80;
+            }
+
+            const double progress = static_cast<double>(processed_files) /
+                static_cast<double>(total_files);
+            return ClampPercent(5 + static_cast<int>(std::lround(progress * 75.0)));
+        }
+
     } // namespace
 
     void CorpusEngine::run(const std::string& model_path,
                         const std::string& input_text_path,
                         const std::string& output_dir,
-                        const std::string& semantics_rules_path) const {
+                        const std::string& semantics_rules_path,
+                        const ProgressEmitter* progress_emitter) const {
+        NullProgressEmitter default_emitter;
+        const ProgressEmitter* emitter = progress_emitter ? progress_emitter : &default_emitter;
+
+        emitter->emit("Preparing corpus build", 0);
         EnsureDir(output_dir);
 
         TextFileReader reader;
         UDPipeParser parser(model_path);
         const std::vector<InputFile> input_files = ResolveInputFiles(input_text_path);
         const std::vector<SemanticRule> semantic_rules = LoadSemanticRules(semantics_rules_path);
+        emitter->emit("Discovered " + std::to_string(static_cast<unsigned long long>(input_files.size())) +
+                          " input files",
+                      5);
 
         DictionaryBuilder dictionary_builder;
         StructuralLayer structural_layer(output_dir);
@@ -446,8 +475,14 @@ namespace teknegram {
 
         for (std::size_t i = 0; i < input_files.size(); ++i) {
             const std::uint32_t document_id = static_cast<std::uint32_t>(i);
+            const std::string document_name = BaseName(input_files[i].relative_path);
+            const int current_percent = ComputeFileLoopPercent(i, input_files.size());
+
+            emitter->emit("Reading " + document_name, current_percent);
             const std::string text = reader.read_file(input_files[i].absolute_path);
+            emitter->emit("Parsing " + document_name, current_percent);
             const ParsedDocument doc = parser.parse(text, document_id);
+            emitter->emit("Writing " + document_name, current_percent);
             core_token_layer.append_document(doc, &dictionary_builder, &structural_layer);
 
             metadata_writer.upsert_document(document_id,
@@ -513,8 +548,12 @@ namespace teknegram {
                 semantic_value_postings[value_id].push_back(document_id);
                 doc_groups[document_id].push_back(std::make_pair(key_id, value_id));
             }
+
+            emitter->emit("Processed " + document_name,
+                          ComputeFileLoopPercent(i + 1U, input_files.size()));
         }
 
+        emitter->emit("Building semantic filter artifacts", 81);
         WriteSemanticFilterArtifacts(output_dir,
                                      static_cast<std::uint32_t>(input_files.size()),
                                      semantic_key_lexicon,
@@ -522,25 +561,34 @@ namespace teknegram {
                                      semantic_value_postings,
                                      doc_groups);
 
+        emitter->emit("Writing lexicons", 82);
         dictionary_builder.write_lexicons(output_dir);
 
         InvertedIndexBuilder inverted_builder;
+        emitter->emit("Building lemma index", 84);
         inverted_builder.build_lemma_index(output_dir);
+        emitter->emit("Building POS index", 86);
         inverted_builder.build_pos_index(output_dir);
 
         DependencyIndexBuilder dep_builder;
+        emitter->emit("Building dependency index", 89);
         dep_builder.build(output_dir);
 
         NGramBuilder<2> ngram2;
         NGramBuilder<3> ngram3;
+        emitter->emit("Building 2-grams", 92);
         ngram2.build(output_dir);
+        emitter->emit("Building 3-grams", 95);
         ngram3.build(output_dir);
 
         DocFreqBuilder docfreq_builder;
+        emitter->emit("Building lemma doc frequencies", 98);
         docfreq_builder.build_lemma_docfreq(output_dir);
 
         SparseMatrixBuilder sparse_builder;
+        emitter->emit("Building lemma sparse matrix", 99);
         sparse_builder.build_lemma_matrix(output_dir);
+        emitter->emit("Corpus build complete", 100);
     }
 
 } // namespace teknegram

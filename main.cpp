@@ -4,11 +4,25 @@
 #include <string>
 
 #include "orchestration_layer/corpus_engine.hpp"
+#include "orchestration_layer/progress_emitter.hpp"
 #include "third_party/nlohmann/json.hpp"
 
 namespace {
 
 using json = nlohmann::json;
+
+void EmitJson(const json& payload);
+
+class JsonProgressEmitter : public teknegram::ProgressEmitter {
+    public:
+        virtual void emit(const std::string& message, int percent) const {
+            EmitJson(json{
+                {"type", "progress"},
+                {"message", message},
+                {"percent", percent}
+            });
+        }
+};
 
 bool HasNonWhitespace(const std::string& value) {
     for (std::string::size_type i = 0; i < value.size(); ++i) {
@@ -30,14 +44,6 @@ std::string ReadStdin() {
 void EmitJson(const json& payload) {
     std::cout << payload.dump() << std::endl;
     std::cout.flush();
-}
-
-void EmitProgress(const std::string& message, int percent) {
-    EmitJson(json{
-        {"type", "progress"},
-        {"message", message},
-        {"percent", percent}
-    });
 }
 
 void EmitResult(const json& data) {
@@ -66,10 +72,11 @@ void RunCorpusPipeline(
     const std::string& model_path,
     const std::string& input_text_path,
     const std::string& output_dir,
-    const std::string& semantics_rules_path
+    const std::string& semantics_rules_path,
+    const teknegram::ProgressEmitter* progress_emitter
 ) {
     teknegram::CorpusEngine engine;
-    engine.run(model_path, input_text_path, output_dir, semantics_rules_path);
+    engine.run(model_path, input_text_path, output_dir, semantics_rules_path, progress_emitter);
 }
 
 int RunCliMode(int argc, char** argv) {
@@ -89,7 +96,7 @@ int RunCliMode(int argc, char** argv) {
         ? argv[4]
         : "";
 
-    RunCorpusPipeline(model_path, input_text_path, output_dir, semantics_rules_path);
+    RunCorpusPipeline(model_path, input_text_path, output_dir, semantics_rules_path, 0);
     std::cout << "Corpus pipeline completed. Output: " << output_dir << "\n";
     return 0;
 }
@@ -118,12 +125,11 @@ int RunJsonMode(const std::string& input_text) {
             ? input_data["semanticsRulesPath"].get<std::string>()
             : "";
 
-        EmitProgress("Validating build request", 5);
-        EmitProgress("Starting corpus build", 15);
+        JsonProgressEmitter progress_emitter;
+        progress_emitter.emit("Validating build request", 1);
 
-        RunCorpusPipeline(model_path, input_path, output_dir, semantics_rules_path);
+        RunCorpusPipeline(model_path, input_path, output_dir, semantics_rules_path, &progress_emitter);
 
-        EmitProgress("Finalizing corpus artifacts", 95);
         EmitResult(json{
             {"command", command},
             {"outputDir", output_dir},
