@@ -443,6 +443,7 @@ namespace teknegram {
                         const std::string& input_text_path,
                         const std::string& output_dir,
                         const std::string& semantics_rules_path,
+                        const BuildOptions& build_options,
                         const ProgressEmitter* progress_emitter) const {
         NullProgressEmitter default_emitter;
         const ProgressEmitter* emitter = progress_emitter ? progress_emitter : &default_emitter;
@@ -553,6 +554,10 @@ namespace teknegram {
                           ComputeFileLoopPercent(i + 1U, input_files.size()));
         }
 
+        emitter->emit("Finalizing corpus binaries", 80);
+        core_token_layer.finalize();
+        structural_layer.finalize();
+
         emitter->emit("Building semantic filter artifacts", 81);
         WriteSemanticFilterArtifacts(output_dir,
                                      static_cast<std::uint32_t>(input_files.size()),
@@ -562,32 +567,45 @@ namespace teknegram {
                                      doc_groups);
 
         emitter->emit("Writing lexicons", 82);
-        dictionary_builder.write_lexicons(output_dir);
+        dictionary_builder.write_lexicons(output_dir, build_options.posting_encoding);
 
         InvertedIndexBuilder inverted_builder;
-        emitter->emit("Building lemma index", 84);
-        inverted_builder.build_lemma_index(output_dir);
+        emitter->emit("Building word index", 84);
+        inverted_builder.build_word_index(output_dir, build_options.posting_encoding);
+        emitter->emit("Building lemma index", 85);
+        inverted_builder.build_lemma_index(output_dir, build_options.posting_encoding);
         emitter->emit("Building POS index", 86);
-        inverted_builder.build_pos_index(output_dir);
+        inverted_builder.build_pos_index(output_dir, build_options.posting_encoding);
 
         DependencyIndexBuilder dep_builder;
         emitter->emit("Building dependency index", 89);
-        dep_builder.build(output_dir);
+        dep_builder.build(output_dir, build_options.posting_encoding);
 
         NGramBuilder<2> ngram2;
         NGramBuilder<3> ngram3;
+        NGramBuilder<4> ngram4;
         emitter->emit("Building 2-grams", 92);
-        ngram2.build(output_dir);
-        emitter->emit("Building 3-grams", 95);
-        ngram3.build(output_dir);
+        const FeatureRowsResult ngram2_rows = ngram2.build(output_dir, build_options, emitter, 92);
+        emitter->emit("Building 3-grams", 93);
+        const FeatureRowsResult ngram3_rows = ngram3.build(output_dir, build_options, emitter, 93);
+        emitter->emit("Building 4-grams", 94);
+        const FeatureRowsResult ngram4_rows = ngram4.build(output_dir, build_options, emitter, 94);
 
         DocFreqBuilder docfreq_builder;
-        emitter->emit("Building lemma doc frequencies", 98);
-        docfreq_builder.build_lemma_docfreq(output_dir);
+        emitter->emit("Building word doc frequencies", 95);
+        const FeatureRowsResult word_rows =
+            docfreq_builder.build_word_docfreq(output_dir, build_options.posting_encoding);
+        emitter->emit("Building lemma doc frequencies", 96);
+        const FeatureRowsResult lemma_rows =
+            docfreq_builder.build_lemma_docfreq(output_dir, build_options.posting_encoding);
 
         SparseMatrixBuilder sparse_builder;
-        emitter->emit("Building lemma sparse matrix", 99);
-        sparse_builder.build_lemma_matrix(output_dir);
+        emitter->emit("Building sparse matrices", 99);
+        sparse_builder.build_matrix(output_dir, "word", word_rows);
+        sparse_builder.build_matrix(output_dir, "lemma", lemma_rows);
+        sparse_builder.build_matrix(output_dir, "2gram", ngram2_rows);
+        sparse_builder.build_matrix(output_dir, "3gram", ngram3_rows);
+        sparse_builder.build_matrix(output_dir, "4gram", ngram4_rows);
         emitter->emit("Corpus build complete", 100);
     }
 

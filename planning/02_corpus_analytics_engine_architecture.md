@@ -47,7 +47,7 @@ Generated: 2026-03-01
                                              per doc     ...         token       finalized   
                                                                      iteration               
 
-  token→doc   token_doc.bin         uint32   doc id per  1 1 1 2 2   Fast        Write       None
+  token→doc   word_doc.bin          uint32   doc id per  1 1 1 2 2   Fast        Write       None
                                              token       ...         filtering   during      
                                                                      by document parsing     
   --------------------------------------------------------------------------------------------------------
@@ -72,21 +72,18 @@ Delta + Variable Byte encoding.
   reverse                                     child       \[child...\]      traversal     head.bin    VarByte
                                               positions                                               
 
-  2g token  2g.pos.index.\*   small           2-gram →    bundle →          Concordance   Sliding     Delta +
+  2gram token  2g.pos.index.\*   small        2-gram →    bundle →          Concordance   Sliding     Delta +
   index                                       start       \[pos...\]                      window      VarByte
                                               positions                                   build       
 
-  3g token  3g.pos.index.\*   moderate        3-gram →    same              Concordance   Sliding     Delta +
+  3gram token  3g.pos.index.\*   moderate     3-gram →    same              Concordance   Sliding     Delta +
   index                                       start                                       window      VarByte
                                               positions                                               
 
-  4g token  4g.pos.index.\*   pruned          4-gram →    same              Concordance   Store freq  Delta +
+  4gram token  4g.pos.index.\*   pruned       4-gram →    same              Concordance   Store freq  Delta +
   index                                       start                                       ≥ 2         VarByte
                                               positions                                               
 
-  5g token  5g.pos.index.\*   pruned          5-gram →    same              Concordance   Store freq  Delta +
-  index                                       start                                       ≥ 2         VarByte
-                                              positions                                               
   -----------------------------------------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
@@ -108,43 +105,41 @@ Store feature → (doc_id, count) postings.
                                           counts                                  corpus    uint16 count
                                                                                   pass      
 
-  2g        2g.docfreq.\*      moderate   2-gram →  same              Monte Carlo Sliding   Delta
-  docfreq                                 doc                                     window    
-                                          counts                                            
+  2gram     2gram.docfreq.\*.  moderate   2-gram →  same              Monte Carlo Build     Delta
+  docfreq                                 doc                                     from    
+                                          counts                                  corpus
+                                                                                  pass   
 
-  3g        3g.docfreq.\*      larger     3-gram →  same              Monte Carlo Sliding   Delta
-  docfreq                                 doc                                     window    
-                                          counts                                            
+  3gram     3gram.docfreq.\*.  larger     3-gram →  same              Monte Carlo Build     Delta
+  docfreq                                 doc                                     from    
+                                          counts                                  corpus
+                                                                                  pass      
 
-  4g        4g.docfreq.\*      pruned     4-gram →  same              Core Monte  freq ≥ 2  Delta
-  docfreq                                 doc                         Carlo       only      
-                                          counts                                            
+  4gram     4gram.docfreq.\*.  larger     4-gram →  same              Core Monte  Build     Delta
+  docfreq                                 doc                         Carlo       from     
+                                          counts                                  corpus
+                                                                                  pass      
 
-  5g        5g.docfreq.\*      pruned     5-gram →  same              Advanced    freq ≥ 2  Delta
-  docfreq                                 doc                         Monte Carlo only      
-                                          counts                                            
-  -------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
 # 5. N-Gram Lexicon Layer
 
-  --------------------------------------------------------------------------------------------------------------
-  type      filename         size      purpose         shape                 reading     writing   compression
-  --------- ---------------- --------- --------------- --------------------- ----------- --------- -------------
-  2g        2g.lexicon.bin   8 bytes × (l1,l2)         \[(12,5),(5,7)...\]   Maps        Build     Raw uint32
-  lexicon                    entries                                         bundle_id → from hash 
-                                                                             words       map       
+  -----------------------------------------------------------------------------------------------------------------
+  type      filename            size      purpose         shape                 reading     writing   compression
+  --------- ------------------- --------- --------------- --------------------- ----------- --------- -------------
+  2g        2gram.lexicon.bin   8 bytes × (l1,l2)         \[(12,5),(5,7)...\]   Maps        Build     Raw uint32
+  lexicon                       entries                                         bundle_id → from hash 
+                                                                                words       map       
 
-  3g        3g.lexicon.bin   12 bytes  (l1,l2,l3)      same                  Same        Same      Raw uint32
-  lexicon                    × entries                                                             
+  3g        3gram.lexicon.bin   12 bytes  (l1,l2,l3)      same                  Same        Same      Raw uint32
+  lexicon                       × entries                                                             
 
-  4g        4g.lexicon.bin   16 bytes  (l1,l2,l3,l4)   same                  Same        freq ≥ 2  Raw uint32
-  lexicon                    × entries                                                             
-
-  5g        5g.lexicon.bin   20 bytes  same            same                  Same        freq ≥ 2  Raw uint32
-  lexicon                    × entries                                                             
-  --------------------------------------------------------------------------------------------------------------
+  4g        4gram.lexicon.bin   16 bytes  (l1,l2,l3,l4)   same                  Same        freq ≥ 2  Raw uint32
+  lexicon                       × entries                                                             
+                                                      
+  -----------------------------------------------------------------------------------------------------------------
 
 ------------------------------------------------------------------------
 
