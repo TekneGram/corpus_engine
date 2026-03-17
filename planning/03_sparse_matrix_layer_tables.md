@@ -142,7 +142,8 @@ Properties:
 -   Designed for scientific computing, not search
 
 The `2gram`, `3gram`, and `4gram` sparse matrices are built from
-word-based n-gram bundle IDs.
+combined word+POS n-gram feature IDs, with aligned word and POS
+sidecars in `*gram.lexicon.bin` and `*gram.pos.lexicon.bin`.
 
 ------------------------------------------------------------------------
 

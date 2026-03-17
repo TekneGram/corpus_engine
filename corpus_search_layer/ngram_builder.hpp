@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <algorithm>
 #include <cstdint>
 #include <fstream>
 #include <map>
@@ -29,6 +30,8 @@ namespace teknegram {
                 emitter->emit("Building " + stem() + ": loading token arrays", progress_percent);
                 const std::vector<std::uint32_t> words =
                     load_uint32_file(corpus_dir + "/word.bin");
+                const std::vector<std::uint8_t> pos =
+                    load_uint8_file(corpus_dir + "/pos.bin");
                 std::vector<std::uint32_t> sentence_starts =
                     load_uint32_file(corpus_dir + "/sentence_bounds.bin");
                 const std::vector<std::uint32_t> word_doc =
@@ -39,6 +42,9 @@ namespace teknegram {
                 if (word_doc.size() != words.size()) {
                     throw std::runtime_error("word_doc.bin length does not match word.bin.");
                 }
+                if (pos.size() != words.size()) {
+                    throw std::runtime_error("pos.bin length does not match word.bin.");
+                }
                 if (doc_ranges.size() % 2U != 0U) {
                     throw std::runtime_error("doc_ranges.bin is malformed.");
                 }
@@ -48,8 +54,9 @@ namespace teknegram {
 
                 emitter->emit("Building " + stem() + ": collecting bundles", progress_percent);
 
-                std::unordered_map<NGramKey, std::uint32_t, NGramKeyHash> ngram_to_id;
-                std::vector<NGramKey> lexicon;
+                std::unordered_map<NGramFeatureKey, std::uint32_t, NGramFeatureKeyHash> ngram_to_id;
+                std::vector<WordNGramKey> word_lexicon;
+                std::vector<PosNGramKey> pos_lexicon;
                 std::vector<std::uint32_t> freq;
                 std::vector<std::vector<std::uint32_t> > positions;
                 std::vector<std::unordered_map<std::uint32_t, std::uint32_t> > row_maps(num_docs);
@@ -62,18 +69,20 @@ namespace teknegram {
                     }
 
                     for (std::uint32_t i = sent_begin; i + N <= sent_end; ++i) {
-                        NGramKey key;
+                        NGramFeatureKey key;
                         for (std::size_t j = 0; j < N; ++j) {
-                            key.values[j] = words[i + j];
+                            key.word_values[j] = words[i + j];
+                            key.pos_values[j] = pos[i + j];
                         }
 
-                        typename std::unordered_map<NGramKey, std::uint32_t, NGramKeyHash>::iterator it =
+                        typename std::unordered_map<NGramFeatureKey, std::uint32_t, NGramFeatureKeyHash>::iterator it =
                             ngram_to_id.find(key);
                         std::uint32_t id = 0U;
                         if (it == ngram_to_id.end()) {
-                            id = static_cast<std::uint32_t>(lexicon.size());
+                            id = static_cast<std::uint32_t>(word_lexicon.size());
                             ngram_to_id[key] = id;
-                            lexicon.push_back(key);
+                            word_lexicon.push_back(key.words());
+                            pos_lexicon.push_back(key.pos());
                             freq.push_back(0U);
                             if (options.emit_ngram_positions) {
                                 positions.push_back(std::vector<std::uint32_t>());
@@ -95,7 +104,8 @@ namespace teknegram {
 
                 emitter->emit("Building " + stem() + ": writing outputs", progress_percent);
                 return write_outputs(corpus_dir,
-                                     lexicon,
+                                     word_lexicon,
+                                     pos_lexicon,
                                      freq,
                                      positions,
                                      row_maps,
@@ -103,19 +113,51 @@ namespace teknegram {
             }
 
         private:
-            struct NGramKey {
+            struct WordNGramKey {
                 std::array<std::uint32_t, N> values;
 
-                bool operator==(const NGramKey& other) const {
+                bool operator==(const WordNGramKey& other) const {
                     return values == other.values;
                 }
             };
 
-            struct NGramKeyHash {
-                std::size_t operator()(const NGramKey& key) const {
+            struct PosNGramKey {
+                std::array<std::uint8_t, N> values;
+
+                bool operator==(const PosNGramKey& other) const {
+                    return values == other.values;
+                }
+            };
+
+            struct NGramFeatureKey {
+                std::array<std::uint32_t, N> word_values;
+                std::array<std::uint8_t, N> pos_values;
+
+                bool operator==(const NGramFeatureKey& other) const {
+                    return word_values == other.word_values &&
+                           pos_values == other.pos_values;
+                }
+
+                WordNGramKey words() const {
+                    WordNGramKey key;
+                    key.values = word_values;
+                    return key;
+                }
+
+                PosNGramKey pos() const {
+                    PosNGramKey key;
+                    key.values = pos_values;
+                    return key;
+                }
+            };
+
+            struct NGramFeatureKeyHash {
+                std::size_t operator()(const NGramFeatureKey& key) const {
                     std::size_t hash = 0U;
                     for (std::size_t i = 0; i < N; ++i) {
-                        hash ^= static_cast<std::size_t>(key.values[i]) +
+                        hash ^= static_cast<std::size_t>(key.word_values[i]) +
+                            0x9e3779b9U + (hash << 6U) + (hash >> 2U);
+                        hash ^= static_cast<std::size_t>(key.pos_values[i]) +
                             0x9e3779b9U + (hash << 6U) + (hash >> 2U);
                     }
                     return hash;
@@ -124,6 +166,20 @@ namespace teknegram {
 
             static std::string stem() {
                 return std::to_string(static_cast<unsigned long long>(N)) + "gram";
+            }
+
+            static std::vector<std::uint8_t> load_uint8_file(const std::string& path) {
+                std::ifstream in(path.c_str(), std::ios::binary | std::ios::in);
+                if (!in) {
+                    throw std::runtime_error("NGramBuilder failed to open input file: " + path);
+                }
+
+                std::vector<std::uint8_t> values;
+                std::uint8_t value = 0U;
+                while (in.read(reinterpret_cast<char*>(&value), sizeof(value))) {
+                    values.push_back(value);
+                }
+                return values;
             }
 
             static std::vector<std::uint32_t> load_uint32_file(const std::string& path) {
@@ -142,7 +198,8 @@ namespace teknegram {
 
             static FeatureRowsResult write_outputs(
                 const std::string& corpus_dir,
-                const std::vector<NGramKey>& lexicon,
+                const std::vector<WordNGramKey>& word_lexicon,
+                const std::vector<PosNGramKey>& pos_lexicon,
                 const std::vector<std::uint32_t>& freq,
                 const std::vector<std::vector<std::uint32_t> >& positions,
                 const std::vector<std::unordered_map<std::uint32_t, std::uint32_t> >& row_maps,
@@ -152,9 +209,11 @@ namespace teknegram {
 
                 std::ofstream lexicon_out((corpus_dir + "/" + stem_name + ".lexicon.bin").c_str(),
                                           std::ios::binary | std::ios::out | std::ios::trunc);
+                std::ofstream pos_lexicon_out((corpus_dir + "/" + stem_name + ".pos.lexicon.bin").c_str(),
+                                              std::ios::binary | std::ios::out | std::ios::trunc);
                 std::ofstream freq_out((corpus_dir + "/" + stem_name + ".freq.bin").c_str(),
                                        std::ios::binary | std::ios::out | std::ios::trunc);
-                if (!lexicon_out || !freq_out) {
+                if (!lexicon_out || !pos_lexicon_out || !freq_out) {
                     throw std::runtime_error("NGramBuilder failed to open outputs.");
                 }
 
@@ -165,7 +224,7 @@ namespace teknegram {
 
                 std::vector<std::vector<std::uint32_t> > filtered_positions;
                 std::uint32_t kept_count = 0U;
-                for (std::size_t i = 0; i < lexicon.size(); ++i) {
+                for (std::size_t i = 0; i < word_lexicon.size(); ++i) {
                     if (N == 4U && freq[i] < 2U) {
                         continue;
                     }
@@ -174,8 +233,10 @@ namespace teknegram {
                     }
 
                     for (std::size_t j = 0; j < N; ++j) {
-                        lexicon_out.write(reinterpret_cast<const char*>(&lexicon[i].values[j]),
+                        lexicon_out.write(reinterpret_cast<const char*>(&word_lexicon[i].values[j]),
                                           sizeof(std::uint32_t));
+                        pos_lexicon_out.write(reinterpret_cast<const char*>(&pos_lexicon[i].values[j]),
+                                              sizeof(std::uint8_t));
                     }
                     freq_out.write(reinterpret_cast<const char*>(&freq[i]),
                                    sizeof(std::uint32_t));
@@ -215,6 +276,7 @@ namespace teknegram {
                         entry.count = it->second;
                         docfreq_postings[new_id].push_back(entry);
                     }
+                    std::sort(result.rows[doc_id].begin(), result.rows[doc_id].end());
                 }
 
                 WriteDocFreqIndex(corpus_dir + "/" + stem_name + ".docfreq.header",

@@ -129,15 +129,25 @@ Store feature → (doc_id, count) postings.
   -----------------------------------------------------------------------------------------------------------------
   type      filename            size      purpose         shape                 reading     writing   compression
   --------- ------------------- --------- --------------- --------------------- ----------- --------- -------------
-  2g        2gram.lexicon.bin   8 bytes × (l1,l2)         \[(12,5),(5,7)...\]   Maps        Build     Raw uint32
+  2g        2gram.lexicon.bin   8 bytes × (w1,w2)         \[(12,5),(5,7)...\]   Maps        Build     Raw uint32
   lexicon                       entries                                         bundle_id → from hash 
                                                                                 words       map       
 
-  3g        3gram.lexicon.bin   12 bytes  (l1,l2,l3)      same                  Same        Same      Raw uint32
+  2g POS    2gram.pos.lexicon.  2 bytes × (p1,p2)         same                  Maps        Build     Raw uint8
+  lexicon   bin                 entries                                         bundle_id → with 2g
+                                                                                POS         lexicon
+
+  3g        3gram.lexicon.bin   12 bytes  (w1,w2,w3)      same                  Same        Same      Raw uint32
   lexicon                       × entries                                                             
 
-  4g        4gram.lexicon.bin   16 bytes  (l1,l2,l3,l4)   same                  Same        freq ≥ 2  Raw uint32
+  3g POS    3gram.pos.lexicon.  3 bytes × (p1,p2,p3)      same                  Same        Same      Raw uint8
+  lexicon   bin                 entries                                                             
+
+  4g        4gram.lexicon.bin   16 bytes  (w1,w2,w3,w4)   same                  Same        freq ≥ 2  Raw uint32
   lexicon                       × entries                                                             
+
+  4g POS    4gram.pos.lexicon.  4 bytes × (p1,p2,p3,p4)   same                  Same        freq ≥ 2  Raw uint8
+  lexicon   bin                 entries                                                             
                                                       
   -----------------------------------------------------------------------------------------------------------------
 

@@ -64,8 +64,16 @@ The pipeline now emits:
 - Sparse matrices:
   - `word.spm.*`, `lemma.spm.*`, `2gram.spm.*`, `3gram.spm.*`, `4gram.spm.*`
 
-Word-based `2gram`, `3gram`, and `4gram` artifacts are generated from
-`word.bin`, not `lemma.bin`.
+`2gram`, `3gram`, and `4gram` feature IDs are generated from aligned
+windows over `word.bin` and `pos.bin`, not `lemma.bin`.
+
+Each n-gram family emits:
+
+- `*gram.lexicon.bin` for the word tuple
+- `*gram.pos.lexicon.bin` for the aligned POS tuple
+
+`*gram.freq.bin`, `*gram.docfreq.*`, `*gram.index.*`, and `*gram.spm.*`
+all refer to the combined word+POS feature ID space.
 
 Optional semantic mapping rules can be supplied as a 4th argument:
 
