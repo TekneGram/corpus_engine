@@ -71,6 +71,29 @@ namespace teknegram {
                                         token_start);
     }
 
+    void CoreTokenLayer::finalize() {
+        if (word_out_.is_open()) {
+            word_out_.flush();
+            word_out_.close();
+        }
+        if (lemma_out_.is_open()) {
+            lemma_out_.flush();
+            lemma_out_.close();
+        }
+        if (pos_out_.is_open()) {
+            pos_out_.flush();
+            pos_out_.close();
+        }
+        if (head_out_.is_open()) {
+            head_out_.flush();
+            head_out_.close();
+        }
+        if (deprel_out_.is_open()) {
+            deprel_out_.flush();
+            deprel_out_.close();
+        }
+    }
+
     std::uint32_t CoreTokenLayer::global_token_count() const {
         return global_token_counter_;
     }

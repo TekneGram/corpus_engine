@@ -26,6 +26,21 @@ namespace teknegram {
             word_doc_out_.write(reinterpret_cast<const char*>(&doc_id), sizeof(doc_id));
         }
     }
+
+    void StructuralLayer::finalize() {
+        if (sentence_bounds_out_.is_open()) {
+            sentence_bounds_out_.flush();
+            sentence_bounds_out_.close();
+        }
+        if (doc_ranges_out_.is_open()) {
+            doc_ranges_out_.flush();
+            doc_ranges_out_.close();
+        }
+        if (word_doc_out_.is_open()) {
+            word_doc_out_.flush();
+            word_doc_out_.close();
+        }
+    }
 }
 
 /*

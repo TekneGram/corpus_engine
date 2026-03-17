@@ -554,6 +554,10 @@ namespace teknegram {
                           ComputeFileLoopPercent(i + 1U, input_files.size()));
         }
 
+        emitter->emit("Finalizing corpus binaries", 80);
+        core_token_layer.finalize();
+        structural_layer.finalize();
+
         emitter->emit("Building semantic filter artifacts", 81);
         WriteSemanticFilterArtifacts(output_dir,
                                      static_cast<std::uint32_t>(input_files.size()),
@@ -581,11 +585,11 @@ namespace teknegram {
         NGramBuilder<3> ngram3;
         NGramBuilder<4> ngram4;
         emitter->emit("Building 2-grams", 92);
-        const FeatureRowsResult ngram2_rows = ngram2.build(output_dir, build_options);
+        const FeatureRowsResult ngram2_rows = ngram2.build(output_dir, build_options, emitter, 92);
         emitter->emit("Building 3-grams", 93);
-        const FeatureRowsResult ngram3_rows = ngram3.build(output_dir, build_options);
+        const FeatureRowsResult ngram3_rows = ngram3.build(output_dir, build_options, emitter, 93);
         emitter->emit("Building 4-grams", 94);
-        const FeatureRowsResult ngram4_rows = ngram4.build(output_dir, build_options);
+        const FeatureRowsResult ngram4_rows = ngram4.build(output_dir, build_options, emitter, 94);
 
         DocFreqBuilder docfreq_builder;
         emitter->emit("Building word doc frequencies", 95);

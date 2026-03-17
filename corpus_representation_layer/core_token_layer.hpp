@@ -16,6 +16,7 @@ namespace teknegram {
             void append_document(const ParsedDocument& doc,
                                  DictionaryBuilder* dictionary_builder,
                                  StructuralLayer* structural_layer);
+            void finalize();
             std::uint32_t global_token_count() const;
 
         private:
