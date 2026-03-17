@@ -6,8 +6,8 @@ namespace teknegram {
     StructuralLayer::StructuralLayer(const std::string& output_dir)
     : sentence_bounds_out_((output_dir + "/sentence_bounds.bin").c_str(), std::ios::binary | std::ios::out | std::ios::trunc),
         doc_ranges_out_((output_dir + "/doc_ranges.bin").c_str(), std::ios::binary | std::ios::out | std::ios::trunc),
-        token_doc_out_((output_dir + "/token_doc.bin").c_str(), std::ios::binary | std::ios::out | std::ios::trunc) {
-            if (!sentence_bounds_out_ || !doc_ranges_out_ || !token_doc_out_) {
+        word_doc_out_((output_dir + "/word_doc.bin").c_str(), std::ios::binary | std::ios::out | std::ios::trunc) {
+            if (!sentence_bounds_out_ || !doc_ranges_out_ || !word_doc_out_) {
                 throw std::runtime_error("Failed to open one or more structural layer output files.");
             }
         }
@@ -23,7 +23,7 @@ namespace teknegram {
 
         for (std::uint32_t token = token_start; token < token_end; ++token) {
             (void)token;
-            token_doc_out_.write(reinterpret_cast<const char*>(&doc_id), sizeof(doc_id));
+            word_doc_out_.write(reinterpret_cast<const char*>(&doc_id), sizeof(doc_id));
         }
     }
 }
@@ -49,10 +49,9 @@ doc_1 sentence start: 0 + 0 = 0
 doc_2 sentence start: 5 + 0 = 5
 So logically: [0, 5] as uint32_t
 
-token_doc.bin (on doc_id per token position)
+word_doc.bin (one doc_id per token position)
 token positions 0..4 -> doc_id 1
 token positions 5..9 -> doc_id 2
 So logically [1, 1, 1, 1, 1, 2, 2, 2, 2, 2] as uint32_t
 
 */
-

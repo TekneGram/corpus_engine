@@ -5,6 +5,7 @@
 
 #include "orchestration_layer/corpus_engine.hpp"
 #include "orchestration_layer/progress_emitter.hpp"
+#include "corpus_shared_layer/build_options.hpp"
 #include "third_party/nlohmann/json.hpp"
 
 namespace {
@@ -73,10 +74,11 @@ void RunCorpusPipeline(
     const std::string& input_text_path,
     const std::string& output_dir,
     const std::string& semantics_rules_path,
+    const teknegram::BuildOptions& build_options,
     const teknegram::ProgressEmitter* progress_emitter
 ) {
     teknegram::CorpusEngine engine;
-    engine.run(model_path, input_text_path, output_dir, semantics_rules_path, progress_emitter);
+    engine.run(model_path, input_text_path, output_dir, semantics_rules_path, build_options, progress_emitter);
 }
 
 int RunCliMode(int argc, char** argv) {
@@ -96,7 +98,15 @@ int RunCliMode(int argc, char** argv) {
         ? argv[4]
         : "";
 
-    RunCorpusPipeline(model_path, input_text_path, output_dir, semantics_rules_path, 0);
+    teknegram::BuildOptions build_options;
+    if (argc > 5) {
+        build_options.posting_encoding = teknegram::ParsePostingEncodingMode(argv[5]);
+    }
+    if (argc > 6) {
+        build_options.emit_ngram_positions = std::string(argv[6]) != "false";
+    }
+
+    RunCorpusPipeline(model_path, input_text_path, output_dir, semantics_rules_path, build_options, 0);
     std::cout << "Corpus pipeline completed. Output: " << output_dir << "\n";
     return 0;
 }
@@ -124,18 +134,33 @@ int RunJsonMode(const std::string& input_text) {
             && input_data["semanticsRulesPath"].is_string()
             ? input_data["semanticsRulesPath"].get<std::string>()
             : "";
+        teknegram::BuildOptions build_options;
+        if (input_data.contains("postingFormat") && input_data["postingFormat"].is_string()) {
+            build_options.posting_encoding =
+                teknegram::ParsePostingEncodingMode(input_data["postingFormat"].get<std::string>());
+        }
+        if (input_data.contains("emitNgramPositions") && input_data["emitNgramPositions"].is_boolean()) {
+            build_options.emit_ngram_positions = input_data["emitNgramPositions"].get<bool>();
+        }
 
         JsonProgressEmitter progress_emitter;
         progress_emitter.emit("Validating build request", 1);
 
-        RunCorpusPipeline(model_path, input_path, output_dir, semantics_rules_path, &progress_emitter);
+        RunCorpusPipeline(model_path,
+                          input_path,
+                          output_dir,
+                          semantics_rules_path,
+                          build_options,
+                          &progress_emitter);
 
         EmitResult(json{
             {"command", command},
             {"outputDir", output_dir},
             {"inputPath", input_path},
             {"modelPath", model_path},
-            {"semanticsRulesPath", semantics_rules_path}
+            {"semanticsRulesPath", semantics_rules_path},
+            {"postingFormat", teknegram::PostingEncodingModeToString(build_options.posting_encoding)},
+            {"emitNgramPositions", build_options.emit_ngram_positions}
         });
 
         return 0;

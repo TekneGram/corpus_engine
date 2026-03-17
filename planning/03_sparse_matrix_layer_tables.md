@@ -3,7 +3,7 @@
 This layer stores a document-first sparse matrix (CSR-style) optimized
 for Monte Carlo simulation and large-scale numerical corpus analytics.
 
-Each feature family (lemma, 2g, 3g, 4g, 5g) has three binary files:
+Each feature family (lemma, 2gram, 3gram, 4gram) has three binary files:
 
 -   `.spm.meta.bin`
 -   `.spm.offsets.bin`
@@ -22,21 +22,18 @@ Each feature family (lemma, 2g, 3g, 4g, 5g) has three binary files:
                                        and                             complete   
                                        validation                                 
 
-  2g SPM  2g.spm.meta.bin      64      Same for     Fixed    Same      Same       None
+  2g SPM  2gram.spm.meta.bin   64      Same for     Fixed    Same      Same       None
   meta                         bytes   2-grams      header                        
                                                     struct                        
 
-  3g SPM  3g.spm.meta.bin      64      Same for     Fixed    Same      Same       None
+  3g SPM  3gram.spm.meta.bin   64      Same for     Fixed    Same      Same       None
   meta                         bytes   3-grams      header                        
                                                     struct                        
 
-  4g SPM  4g.spm.meta.bin      64      Same for     Fixed    Same      Same       None
+  4g SPM  4gram.spm.meta.bin   64      Same for     Fixed    Same      Same       None
   meta                         bytes   4-grams      header                        
                                                     struct                        
-
-  5g SPM  5g.spm.meta.bin      64      Same for     Fixed    Same      Same       None
-  meta                         bytes   5-grams      header                        
-                                                    struct                        
+                     
   ---------------------------------------------------------------------------------------------
 
 ### Header Structure (64 bytes)
@@ -62,17 +59,14 @@ Each feature family (lemma, 2g, 3g, 4g, 5g) has three binary files:
                                                            entries        document     matrix    
                                                                                        build     
 
-  2g SPM    2g.spm.offsets.bin      Same      Same         Same           Same         Same      None
+  2g SPM    2gram.spm.offsets.bin   Same      Same         Same           Same         Same      None
   offsets                           pattern                                                      
 
-  3g SPM    3g.spm.offsets.bin      Same      Same         Same           Same         Same      None
+  3g SPM    3gram.spm.offsets.bin   Same      Same         Same           Same         Same      None
   offsets                                                                                        
 
-  4g SPM    4g.spm.offsets.bin      Same      Same         Same           Same         Same      None
-  offsets                                                                                        
-
-  5g SPM    5g.spm.offsets.bin      Same      Same         Same           Same         Same      None
-  offsets                                                                                        
+  4g SPM    4gram.spm.offsets.bin   Same      Same         Same           Same         Same      None
+  offsets                                                                                                                                                    
   ------------------------------------------------------------------------------------------------------------
 
 ### Interpretation
@@ -102,17 +96,14 @@ Properties:
                                                                       inner     pass      
                                                                       loop                
 
-  2g SPM    2g.spm.entries.bin      Same    Same           Same       Same      Same      None
+  2g SPM    2gram.spm.entries.bin   Same    Same           Same       Same      Same      None
   entries                                                                                 
 
-  3g SPM    3g.spm.entries.bin      Same    Same           Same       Same      Same      None
+  3g SPM    3gram.spm.entries.bin   Same    Same           Same       Same      Same      None
   entries                                                                                 
 
-  4g SPM    4g.spm.entries.bin      Same    Same           Same       Same      Same      None
-  entries                                                                                 
-
-  5g SPM    5g.spm.entries.bin      Same    Same           Same       Same      Same      None
-  entries                                                                                 
+  4g SPM    4gram.spm.entries.bin   Same    Same           Same       Same      Same      None
+  entries                                                                                                                                                             
   -----------------------------------------------------------------------------------------------------
 
 ### Entry Structure

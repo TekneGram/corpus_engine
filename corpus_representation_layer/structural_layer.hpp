@@ -14,6 +14,6 @@ namespace teknegram {
         private:
             std::ofstream sentence_bounds_out_;
             std::ofstream doc_ranges_out_;
-            std::ofstream token_doc_out_;
+            std::ofstream word_doc_out_;
     };
 }

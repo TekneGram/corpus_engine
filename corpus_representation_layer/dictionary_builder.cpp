@@ -1,5 +1,7 @@
 #include "dictionary_builder.hpp"
 
+#include <cstddef>
+#include <cstring>
 #include <fstream>
 #include <stdexcept>
 
@@ -7,7 +9,7 @@ namespace teknegram {
 
     namespace {
 
-        void WriteStringLexicon(const std::string& path, const std::vector<std::string>& values) {
+        void WriteRawStringLexicon(const std::string& path, const std::vector<std::string>& values) {
             std::ofstream out(path.c_str(), std::ios::binary | std::ios::out | std::ios::trunc);
             if (!out) {
                 throw std::runtime_error("Failed to open lexicon output: " + path);
@@ -20,6 +22,54 @@ namespace teknegram {
                 const std::uint32_t len = static_cast<std::uint32_t>(values[i].size());
                 out.write(reinterpret_cast<const char*>(&len), sizeof(len));
                 out.write(values[i].data(), static_cast<std::streamsize>(values[i].size()));
+            }
+        }
+
+        void WriteFrontCodedLexicon(const std::string& path, const std::vector<std::string>& values) {
+            std::ofstream out(path.c_str(), std::ios::binary | std::ios::out | std::ios::trunc);
+            if (!out) {
+                throw std::runtime_error("Failed to open lexicon output: " + path);
+            }
+
+            const std::uint32_t count = static_cast<std::uint32_t>(values.size());
+            out.write(reinterpret_cast<const char*>(&count), sizeof(count));
+
+            std::string previous;
+            for (std::size_t i = 0; i < values.size(); ++i) {
+                std::size_t prefix = 0U;
+                while (prefix < previous.size() &&
+                       prefix < values[i].size() &&
+                       previous[prefix] == values[i][prefix]) {
+                    ++prefix;
+                }
+
+                const std::uint32_t prefix_len = static_cast<std::uint32_t>(prefix);
+                const std::uint32_t suffix_len =
+                    static_cast<std::uint32_t>(values[i].size() - prefix);
+                out.write(reinterpret_cast<const char*>(&prefix_len), sizeof(prefix_len));
+                out.write(reinterpret_cast<const char*>(&suffix_len), sizeof(suffix_len));
+                if (suffix_len > 0U) {
+                    out.write(values[i].data() + prefix,
+                              static_cast<std::streamsize>(suffix_len));
+                }
+                previous = values[i];
+            }
+        }
+
+        void WriteStaticLexicon(const std::string& path,
+                                const char* const* values,
+                                std::size_t count) {
+            std::ofstream out(path.c_str(), std::ios::binary | std::ios::out | std::ios::trunc);
+            if (!out) {
+                throw std::runtime_error("Failed to open lexicon output: " + path);
+            }
+
+            const std::uint32_t item_count = static_cast<std::uint32_t>(count);
+            out.write(reinterpret_cast<const char*>(&item_count), sizeof(item_count));
+            for (std::size_t i = 0; i < count; ++i) {
+                const std::uint32_t len = static_cast<std::uint32_t>(std::strlen(values[i]));
+                out.write(reinterpret_cast<const char*>(&len), sizeof(len));
+                out.write(values[i], static_cast<std::streamsize>(len));
             }
         }
 
@@ -55,9 +105,35 @@ namespace teknegram {
         return lemma_reverse_.size();
     }
 
-    void DictionaryBuilder::write_lexicons(const std::string& output_dir) const {
-        WriteStringLexicon(output_dir + "/word.lexicon.bin", word_reverse_);
-        WriteStringLexicon(output_dir + "/lemma.lexicon.bin", lemma_reverse_);
+    void DictionaryBuilder::write_lexicons(const std::string& output_dir,
+                                           PostingEncodingMode mode) const {
+        static const char* const kPosLexicon[] = {
+            "UNKNOWN", "ADJ", "ADP", "ADV", "AUX", "CCONJ", "DET", "INTJ",
+            "NOUN", "NUM", "PART", "PRON", "PROPN", "PUNCT", "SCONJ",
+            "SYM", "VERB", "X"
+        };
+        static const char* const kDeprelLexicon[] = {
+            "UNKNOWN", "acl", "advcl", "advmod", "amod", "appos", "aux",
+            "case", "cc", "ccomp", "clf", "compound", "conj", "cop",
+            "csubj", "dep", "det", "discourse", "dislocated", "expl",
+            "fixed", "flat", "goeswith", "iobj", "list", "mark", "nmod",
+            "nsubj", "nummod", "obj", "obl", "orphan", "parataxis",
+            "punct", "reparandum", "root", "vocative", "xcomp"
+        };
+
+        if (mode == PostingEncodingMode::kCompressed) {
+            WriteFrontCodedLexicon(output_dir + "/word.lexicon.bin", word_reverse_);
+            WriteFrontCodedLexicon(output_dir + "/lemma.lexicon.bin", lemma_reverse_);
+        } else {
+            WriteRawStringLexicon(output_dir + "/word.lexicon.bin", word_reverse_);
+            WriteRawStringLexicon(output_dir + "/lemma.lexicon.bin", lemma_reverse_);
+        }
+        WriteStaticLexicon(output_dir + "/pos.lexicon.bin",
+                           kPosLexicon,
+                           sizeof(kPosLexicon) / sizeof(kPosLexicon[0]));
+        WriteStaticLexicon(output_dir + "/deprel.lexicon.bin",
+                           kDeprelLexicon,
+                           sizeof(kDeprelLexicon) / sizeof(kDeprelLexicon[0]));
     }
 
 } // namespace corpus

@@ -48,8 +48,24 @@ builds `corpus_build_pipeline`.
   corpus_output
 ```
 
-Outputs include core token binaries, structure files, indexes, docfreq,
-and sparse-matrix files in `corpus_output/`.
+Outputs include core token binaries, structure files, dictionaries,
+indexes, docfreq, and sparse-matrix files in `corpus_output/`.
+
+The pipeline now emits:
+
+- Core token binaries:
+  - `word.bin`, `lemma.bin`, `pos.bin`, `head.bin`, `deprel.bin`
+- Structure binaries:
+  - `sentence_bounds.bin`, `doc_ranges.bin`, `word_doc.bin`
+- Dictionaries:
+  - `word.lexicon.bin`, `lemma.lexicon.bin`, `pos.lexicon.bin`, `deprel.lexicon.bin`
+- Search/docfreq families:
+  - `word`, `lemma`, `2gram`, `3gram`, `4gram`
+- Sparse matrices:
+  - `word.spm.*`, `lemma.spm.*`, `2gram.spm.*`, `3gram.spm.*`, `4gram.spm.*`
+
+Word-based `2gram`, `3gram`, and `4gram` artifacts are generated from
+`word.bin`, not `lemma.bin`.
 
 Optional semantic mapping rules can be supplied as a 4th argument:
 
@@ -65,6 +81,28 @@ When semantic rules are provided, metadata and binary filter artifacts
 for document groups are generated (for example: `semantic.key.lexicon.bin`,
 `semantic.value.lexicon.bin`, `semantic.value_doc.*`,
 `semantic.doc_groups.*`).
+
+Optional output controls:
+
+- 5th CLI arg: posting/docfreq format, `raw` or `compressed`
+- 6th CLI arg: emit n-gram positions, anything except `false` means enabled
+
+Example:
+
+```bash
+./corpus_build_pipeline \
+  models/english-partut-ud-2.5-191206.udpipe \
+  _demo_corpus \
+  corpus_output \
+  "" \
+  compressed \
+  true
+```
+
+The JSON mode also accepts:
+
+- `postingFormat`: `"raw"` or `"compressed"`
+- `emitNgramPositions`: `true` or `false`
 
 ## CI And Commit Checks
 

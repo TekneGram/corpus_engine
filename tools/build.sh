@@ -14,6 +14,8 @@ g++ -std=c++11 -Wall -Wextra -pedantic \
   main.cpp \
   parse_layer/text_file_reader.cpp \
   parse_layer/udpipe_parser.cpp \
+  corpus_shared_layer/build_options.cpp \
+  corpus_shared_layer/artifact_builders.cpp \
   corpus_representation_layer/core_token_layer.cpp \
   corpus_representation_layer/dictionary_builder.cpp \
   corpus_representation_layer/structural_layer.cpp \
