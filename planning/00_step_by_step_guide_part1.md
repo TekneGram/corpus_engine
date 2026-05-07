@@ -154,3 +154,124 @@ Example of pos.bin:
   01 08 10 01 08 01 08 10 01 08 03
 
   So pos.bin is a compact byte stream: one POS byte per token position.
+
+### Adding structural data
+Inside `core_token_layer.append_document` we have the following call to the StructuralLayer object:
+```cpp
+structural_layer->append_document(doc.document_id,
+                                        token_start,
+                                        token_end,
+                                        doc.sentence_starts,
+                                        token_start);
+```
+
+This creates structural information about the corpus in the following binary outputs:
+
+#### **word_doc.bin**
+This maps each global token position to its owning document ID.
+
+  Purpose:
+
+  - lets downstream steps answer “this token position belongs to which doc?”
+  - used by n-gram/docfreq builders to aggregate per-document counts.
+
+  For the doc0 example above (token_start=0, token_end=11, doc_id=0), its segment in word_doc.bin is:
+
+  [0,0,0,0,0,0,0,0,0,0,0]
+
+  (one 0 per token position 0..10).
+
+Data is stored as follows:
+One uint32 doc ID per token position.
+
+  Logical values (81 total):
+
+  [0 x11 times, 1 x10 times, 2 x11 times, 3 x9 times, 4 x11 times, 5 x10 times, 6 x10 times, 7 x9 times]
+
+  Expanded start:
+
+  [0,0,0,0,0,0,0,0,0,0,0, 1,1,1,1,1,1,1,1,1,1, ...]
+
+  Byte examples:
+
+  - doc0 token entries (0): 00 00 00 00 repeated
+  - then doc1 entries (1): 01 00 00 00 repeated
+
+  Start of file:
+
+  00 00 00 00 00 00 00 00 00 00 00 00 ... (11 times)
+  
+  01 00 00 00 01 00 00 00 ... (10 times)
+
+#### **sentence_bounds.bin**
+sentence_bounds.bin stores the global token start position of every sentence in corpus order.
+
+  Purpose:
+
+  - marks sentence boundaries so algorithms (like n-gram extraction) don’t cross sentence edges.
+  - lets you reconstruct sentence spans from the global token stream.
+
+  Example:
+  If sentence starts are [0, 5, 11, 16, ...], then:
+
+  - sentence 0 = tokens [0..4]
+  - sentence 1 = tokens [5..10]
+  - sentence 2 = tokens [11..15]
+    (and the next start marks each end).
+
+Data is stored as follows:
+One uint32 global start per sentence.
+
+  Logical values:
+
+  [0,5, 11,16, 21,26, 32,36, 41,46, 52,57, 62,67, 72,77]
+
+  First bytes:
+
+  - 0  -> 00 00 00 00
+  - 5  -> 05 00 00 00
+  - 11 -> 0B 00 00 00
+  - 16 -> 10 00 00 00
+
+  Start of file:
+
+  00 00 00 00 05 00 00 00 0B 00 00 00 10 00 00 00 ...
+
+#### **doc_ranges.bin**
+doc_ranges.bin stores each document’s global token span as (start, end) pairs.
+
+  Purpose:
+
+  - marks document boundaries in the global token stream.
+  - lets downstream code iterate tokens per document quickly.
+
+  Example:
+
+  doc0: (0,11)
+  doc1: (11,21)
+  doc2: (21,32)
+  ...
+
+  So for document d, its tokens are positions [start, end) (end-exclusive).
+
+Data is stored as follows:
+ Pairs of uint32 (start,end) per doc.
+
+  Logical values:
+
+  [(0,11), (11,21), (21,32), (32,41), (41,52), (52,62), (62,72), (72,81)]
+
+  Flattened uint32 sequence:
+
+  [0,11, 11,21, 21,32, 32,41, 41,52, 52,62, 62,72, 72,81]
+
+  First bytes (little-endian):
+
+  - 0  -> 00 00 00 00
+  - 11 -> 0B 00 00 00
+  - 11 -> 0B 00 00 00
+  - 21 -> 15 00 00 00
+
+  So beginning of file:
+
+  00 00 00 00 0B 00 00 00 0B 00 00 00 15 00 00 00 ...
