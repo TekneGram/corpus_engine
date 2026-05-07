@@ -463,6 +463,7 @@ namespace teknegram {
         StructuralLayer structural_layer(output_dir);
         CoreTokenLayer core_token_layer(output_dir);
         MetadataWriter metadata_writer(output_dir + "/corpus.db");
+        
         std::map<std::string, std::uint32_t> segment_to_id;
         std::uint32_t next_segment_id = 0;
         std::map<std::string, std::uint32_t> semantic_key_to_id;
@@ -484,6 +485,9 @@ namespace teknegram {
             emitter->emit("Parsing " + document_name, current_percent);
             const ParsedDocument doc = parser.parse(text, document_id);
             emitter->emit("Writing " + document_name, current_percent);
+            
+            // Per-document token transformation occurs inside core_token_layer, injecting
+            // dictionary_builder and structural_layer as dependencies.
             core_token_layer.append_document(doc, &dictionary_builder, &structural_layer);
 
             metadata_writer.upsert_document(document_id,

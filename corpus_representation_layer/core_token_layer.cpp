@@ -30,6 +30,7 @@ namespace teknegram {
         const std::uint32_t token_start = global_token_counter_;
 
         std::size_t sentence_idx = 0;
+        // Set the sentence start position
         std::uint32_t current_sentence_start = doc.sentence_starts.empty() ? 0U : doc.sentence_starts[0];
         std::uint32_t next_sentence_start = doc.sentence_starts.size() > 1 ? doc.sentence_starts[1] : static_cast<std::uint32_t>(doc.tokens.size());
 
