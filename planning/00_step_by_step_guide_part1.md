@@ -277,7 +277,10 @@ Data is stored as follows:
   00 00 00 00 0B 00 00 00 0B 00 00 00 15 00 00 00 ...
 
 ## Metadata storage: document and author
+`metadata_writer.cpp` handles all the metadata creation and storage.
+
 Each new corpus creates its own sqlite3 corpus.db database.
+
 From corpus_engine.cpp, line 493:
 ```cpp
 metadata_writer.upsert_document(document_id,
@@ -364,3 +367,86 @@ Using an example relative path like:
   1           | 1     | 2
 
   So folder_segment is the segment dictionary, and document_segment is the doc->(depth,segment) mapping.
+
+## Metadata storage: Assigning semantics to corpus hierarchy.
+Example: At depth zero, we simply have the "corpus". However, at depth 0, we could have subcorpora
+- /corpus/Arts_And_Humanities
+- /corpus/Physical_Sciences
+
+Then at depth 1, we could have further subcorpora
+- /corpus/Arts_And_Humanities/English
+- /corpus/Arts_And_Humanities/Social_Studies
+- /corpus/Physical_Sciences/Physics
+- /corpus/Physical_Sciences/Chemistry
+
+We can assign depth based keys like so
+faculty     depth       0
+discipline  depth       1
+
+The user provides these depth rules using a tsv file:
+  1. UI form includes semanticsRulesPath
+
+  - src/features/CreateProjectModal/CreateProjectModal.tsx
+
+  2. Request type includes optional semanticsRulesPath
+
+  - src/app/ports/projects.ports.ts
+
+  3. Backend validates it exists and is .tsv
+
+  - electron/services/projects/createProject.ts
+
+  4. Backend sends it to native corpus_build_pipeline JSON request as semanticsRulesPath
+
+  - electron/services/projects/createProject.ts
+
+  5. Native loader parses rules via LoadSemanticRules(...) and applies them in AssignSemanticFromRules(...)
+
+  - native/corpus_builder/orchestration_layer/corpus_engine.cpp
+
+Then, if we have:
+  - Arts_and_Humanities/English/doc1.txt
+  - Arts_and_Humanities/Social_Studies/doc2.txt
+  - Physical_Sciences/Physics/doc3.txt
+  - Physical_Sciences/Chemistry/doc4.txt
+the function `AssignSemanticFromRules` in corpus_engine.cpp (line 284) will produce:
+  - doc1 -> faculty=Arts_and_Humanities, discipline=English
+  - doc2 -> faculty=Arts_and_Humanities, discipline=Social_Studies
+  - doc3 -> faculty=Physical_Sciences, discipline=Physics
+  - doc4 -> faculty=Physical_Sciences, discipline=Chemistry
+
+In the corpus.db database, the following type of data can be stored:
+
+  semantic_key
+
+  key_id | key_name
+  0      | faculty
+  1      | discipline
+
+  semantic_value
+
+  value_id | key_id | value_text
+  0        | 0      | Arts_and_Humanities
+  1        | 0      | Physical_Sciences
+  2        | 1      | English
+  3        | 1      | Social_Studies
+  4        | 1      | Physics
+  5        | 1      | Chemistry
+
+  document_group (doc-to-semantic assignment)
+
+  document_id | key_id | value_id
+  0           | 0      | 0   -- faculty=Arts_and_Humanities
+  0           | 1      | 2   -- discipline=English
+  1           | 0      | 0
+  1           | 1      | 3
+  2           | 0      | 1
+  2           | 1      | 4
+  3           | 0      | 1
+  3           | 1      | 5
+
+  document_segment (raw path depth mapping)
+
+  document_id | depth | segment_id
+  0           | 0     | 10   -- Arts_and_Humanities
+  0           | 1     | 20   -- English
