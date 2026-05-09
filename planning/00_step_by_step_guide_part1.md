@@ -39,7 +39,7 @@ struct ParsedDocument {
 }
 ```
 
-`PosId`, `DeprelId` and `DocId` are defined as `std::uint8_t`, `std::uint8_t` and `std::uint32_t` respectively, using fixed width 8 bit unsigned integers for parts of speech and dependency relationsince as there are fewer of them (range 0 - 255) and 32 bit unsigned integers for document ids as there are possibly many of them (range 0 - 4,292,967,295).
+`PosId`, `DeprelId` and `DocId` are defined as `std::uint8_t`, `std::uint8_t` and `std::uint32_t` respectively, using fixed width 8 bit unsigned integers for parts of speech and dependency relations as there are fewer of them (range 0 - 255) and 32 bit unsigned integers for document ids as there are possibly many of them (range 0 - 4,292,967,295).
 
 Note: if an id is assigned 200, it is represented in binary as 11001000 which can be broken down into 1100 = C in hex, and 1000 = 8 in hex, so the raw byte is represented as C8.
 
@@ -200,7 +200,7 @@ One uint32 doc ID per token position.
   Start of file:
 
   00 00 00 00 00 00 00 00 00 00 00 00 ... (11 times)
-  
+
   01 00 00 00 01 00 00 00 ... (10 times)
 
 #### **sentence_bounds.bin**
@@ -275,3 +275,92 @@ Data is stored as follows:
   So beginning of file:
 
   00 00 00 00 0B 00 00 00 0B 00 00 00 15 00 00 00 ...
+
+## Metadata storage: document and author
+Each new corpus creates its own sqlite3 corpus.db database.
+From corpus_engine.cpp, line 493:
+```cpp
+metadata_writer.upsert_document(document_id,
+                                            input_files[i].absolute_path,
+                                            "unknown",
+                                            input_files[i].relative_path);
+```
+ - document_id
+  - title (currently passed as absolute path)
+  - author ("unknown")
+  - relative path
+
+  In metadata_writer.cpp, it executes:
+```sql
+  INSERT OR REPLACE INTO document(document_id, title, author, relative_path)
+  VALUES (?, ?, ?, ?);
+```
+  So purpose: persist document identity/metadata right after token processing, so later layers can map doc IDs back to file metadata.
+
+The author is currently set to "unknown", but this can later be updated to extract the author from the file path.
+
+## Metadata storage: folder hierarchies preserving corpus/subcorpus boundaries
+The following code in corpus_engine.cpp preserves the folder hierarchy, locating the documents in specific folders, which can later allow for data analysis based on subcorpora
+
+```cpp
+const std::string directory = DirName(input_files[i].relative_path);
+            const std::vector<std::string> path_segments = SplitPath(directory);
+            for (std::size_t depth = 0; depth < path_segments.size(); ++depth) {
+                const std::map<std::string, std::uint32_t>::const_iterator found =
+                    segment_to_id.find(path_segments[depth]);
+
+                std::uint32_t segment_id = 0;
+                if (found == segment_to_id.end()) {
+                    segment_id = next_segment_id++;
+                    segment_to_id[path_segments[depth]] = segment_id;
+                    metadata_writer.upsert_folder_segment(segment_id, path_segments[depth]);
+                } else {
+                    segment_id = found->second;
+                }
+
+                metadata_writer.upsert_document_segment(document_id,
+                                                       static_cast<std::uint32_t>(depth),
+                                                       segment_id);
+            }
+```
+A segment essentially refers to a part of a relative path within the corpus folder hierarchy
+Using an example relative path like:
+
+  S_courtroom/unit1/doc_a.txt with document_id = 0
+
+  the two relevant tables would look like this.
+
+  folder_segment:
+
+  segment_id | segment_text
+  -----------+-------------
+  0          | S_courtroom
+  1          | unit1
+
+  document_segment:
+
+  document_id | depth | segment_id
+  ------------+-------+-----------
+  0           | 0     | 0
+  0           | 1     | 1
+
+  If another doc is S_courtroom/unit2/doc_b.txt (document_id = 1), you’d get:
+
+  folder_segment (reuses existing + adds new):
+
+  segment_id | segment_text
+  -----------+-------------
+  0          | S_courtroom
+  1          | unit1
+  2          | unit2
+
+  document_segment:
+
+  document_id | depth | segment_id
+  ------------+-------+-----------
+  0           | 0     | 0
+  0           | 1     | 1
+  1           | 0     | 0
+  1           | 1     | 2
+
+  So folder_segment is the segment dictionary, and document_segment is the doc->(depth,segment) mapping.
