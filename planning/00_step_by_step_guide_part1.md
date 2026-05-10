@@ -450,3 +450,157 @@ In the corpus.db database, the following type of data can be stored:
   document_id | depth | segment_id
   0           | 0     | 10   -- Arts_and_Humanities
   0           | 1     | 20   -- English
+
+  These are the relevant tables:
+  ```sql
+  CREATE TABLE document (
+    document_id INTEGER PRIMARY KEY,
+    title TEXT NOT NULL,
+    author TEXT NOT NULL,
+    relative_path TEXT NOT NULL UNIQUE
+  );
+
+  CREATE TABLE semantic_key (
+    key_id INTEGER PRIMARY KEY,
+    key_name TEXT NOT NULL UNIQUE
+  );
+
+  CREATE TABLE semantic_value (
+    value_id INTEGER PRIMARY KEY,
+    key_id INTEGER NOT NULL,
+    value_text TEXT NOT NULL,
+    UNIQUE(key_id, value_text),
+    FOREIGN KEY(key_id) REFERENCES semantic_key(key_id)
+  );
+
+  CREATE TABLE document_group (
+    document_id INTEGER NOT NULL,
+    key_id INTEGER NOT NULL,
+    value_id INTEGER NOT NULL,
+    PRIMARY KEY(document_id, key_id),
+    FOREIGN KEY(document_id) REFERENCES document(document_id),
+    FOREIGN KEY(key_id) REFERENCES semantic_key(key_id),
+    FOREIGN KEY(value_id) REFERENCES semantic_value(value_id)
+  );
+
+  CREATE TABLE folder_segment (
+    segment_id INTEGER PRIMARY KEY,
+    segment_text TEXT NOT NULL UNIQUE
+  );
+
+  CREATE TABLE document_segment (
+    document_id INTEGER NOT NULL,
+    depth INTEGER NOT NULL,
+    segment_id INTEGER NOT NULL,
+    PRIMARY KEY(document_id, depth),
+    FOREIGN KEY(document_id) REFERENCES document(document_id),
+    FOREIGN KEY(segment_id) REFERENCES folder_segment(segment_id)
+  );
+  ```
+
+  ## Semantic filtering artifacts
+  To avoid slower sql queries on the database, and facilitate faster lookups, such as "look for docs where faculty = Arts_And_Humanities" or "look for docs where discipline=Physics" we create binaries information:
+  - semantic.key.lexicon.bin
+    - key_id -> key_name
+    - e.g.: 0 -> faculty, 1 -> discipline
+
+  - semantic.value.lexicon.bin
+    - value_id -> (key_id, value_text)
+    - e.g., 4 -> (1, "Physics")
+
+Imagine the following set up:
+  - key_id 0 = faculty
+  - key_id 1 = discipline
+  - value_id 0 = (faculty, Arts_and_Humanities)
+  - value_id 1 = (faculty, Physical_Sciences)
+  - value_id 2 = (discipline, English)
+  - value_id 3 = (discipline, Social_Studies)
+  - value_id 4 = (discipline, Physics)
+  - value_id 5 = (discipline, Chemistry)
+
+semantic.value_doc.entries is a big list of document IDs.
+semantic.value_doc.header tells you which part of that big list belongs to each semantic value.
+
+  So it encodes statements like:
+
+  - “Value X appears in documents A, B, C.”
+  - “Value Y appears in documents D, E.”
+
+  Example translation:
+
+  - header says for value_id=1: offset=2, length=2
+  - entries at positions 2 and 3 are [2,3]
+
+  Plain English:
+
+  - “The semantic value with ID 1 applies to document 2 and document 3.”
+
+  - value -> list of docs that have that value.
+
+- semantic.value_doc.entries layout
+
+    Just a flat array of uint32_t doc IDs:
+
+    [doc_id, doc_id, doc_id, ...]
+
+    - Concrete example
+
+    Assume postings by value_id:
+
+    - 0 -> [0,1]
+    - 1 -> [2,3]
+    - 2 -> [0]
+    - 3 -> [1]
+     Left 0 = value_id (a semantic value, not a doc).
+  - Right [0,1] = list of document IDs that have that semantic value.
+
+  So it means:
+
+  - semantic value with ID 0 appears in documents 0 and 1.
+
+  Example with real meaning:
+
+  - if value_id 0 = (faculty, Arts_and_Humanities),
+  - then 0 -> [0,1] means:
+      - doc 0 is Arts_and_Humanities
+      - doc 1 is Arts_and_Humanities
+
+  So:
+
+  - left side = “which semantic value?”
+  - right side = “which docs have it?”
+
+Then
+  - semantic.value_doc.header: This is a lookup take that shows where each semantic value's documents are stored inside semantic.value_doc.entries. For example, if I want value_id = 4 ("Physics") I can jump directly to the right slice.
+
+  semantic.value_doc.header layout is:
+
+  1. header_size (uint32_t)
+
+  - number of value_id header records
+
+  2. header_size repeated records of:
+```cpp
+  struct IndexHeaderEntry {
+    uint64_t offset;
+    uint32_t length;
+  };
+```
+  So binary shape:
+
+  [uint32 header_size]
+  [uint64 offset_0][uint32 length_0]
+  [uint64 offset_1][uint32 length_1]
+  ...
+  [uint64 offset_{N-1}][uint32 length_{N-1}]
+
+  Meaning of each record i:
+
+  - i corresponds to value_id = i
+  - offset_i = start index in semantic.value_doc.entries
+  - length_i = number of doc IDs for that value
+
+  Example:
+
+  - if value_id 2 has (offset=4,length=1),
+  - then read one doc ID at entries[4].
